@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lora_app/logic/services_status.dart';
-import 'package:lora_app/presentation/scan_screen.dart';
-
-
+import 'package:lora_app/logic/providers.dart';
 
 class CheckScreen extends ConsumerWidget {
   const CheckScreen({super.key});
@@ -14,14 +11,6 @@ class CheckScreen extends ConsumerWidget {
 
     return statusAsync.when(
       data: (status) {
-        if (status == ServicesStatus.ready) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            Navigator.of(context).pushReplacement(
-              MaterialPageRoute(builder: (_) => const ScanScreen()),
-            );
-          });
-        }
-
         String message = switch (status) {
           ServicesStatus.notSupported => "Device not supported",
           ServicesStatus.bluetoothOff => "Bluetooth is off",

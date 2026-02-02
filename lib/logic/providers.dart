@@ -1,9 +1,24 @@
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:lora_app/service/ble_service.dart';
+import 'package:lora_app/service/database_service.dart';
 
 enum ServicesStatus { loading, notSupported, bluetoothOff, locationOff, ready }
 
+final bleServiceProvider = Provider<BleService>((ref) {
+  return BleService();
+});
+
+final databaseServiceProvider = Provider<DatabaseService>((ref) {
+  final db = DatabaseService();
+
+  ref.onDispose(() async {
+    await db.closeDatabase();
+  });
+
+  return db;
+});
 
 final servicesStatusProvider = StreamProvider<ServicesStatus>((ref) async* {
   if (!await FlutterBluePlus.isSupported) {
@@ -18,9 +33,8 @@ final servicesStatusProvider = StreamProvider<ServicesStatus>((ref) async* {
     }
 
     // Bluetooth is ON → now track location changes
-    while (true) {
-      final locationEnabled =
-          await Geolocator.isLocationServiceEnabled();
+    while (btState == BluetoothAdapterState.on) {
+      final locationEnabled = await Geolocator.isLocationServiceEnabled();
 
       if (!locationEnabled) {
         yield ServicesStatus.locationOff;
@@ -32,8 +46,7 @@ final servicesStatusProvider = StreamProvider<ServicesStatus>((ref) async* {
       await Future.delayed(const Duration(seconds: 1));
 
       // Exit loop if Bluetooth turns OFF
-      final currentBt =
-          await FlutterBluePlus.adapterState.first;
+      final currentBt = await FlutterBluePlus.adapterState.first;
       if (currentBt != BluetoothAdapterState.on) {
         break;
       }
