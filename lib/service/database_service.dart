@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -38,20 +39,50 @@ class DatabaseService {
     db = AppDatabase(deviceId);
   }
 
-  Future<int> insertMessage(MessagesCompanion message) {
+  Future<int> insertMessage({
+    int? type,
+    int? sourceId,
+    int? destinationId,
+    int? uid,
+    int? totalSegments,
+    String? status,
+    Uint8List? payload,
+  }) async {
+    MessagesCompanion message = MessagesCompanion.insert(
+      type: type!,
+      sourceId: sourceId!,
+      destinationId: destinationId!,
+      uid: uid!,
+      totalSegments: Value(totalSegments!),
+      status: status!,
+      timestamp: DateTime.now().millisecondsSinceEpoch,
+      payload: Value(utf8.decode(payload ?? Uint8List(0))),
+    );
     return db!.into(db!.messages).insert(message);
   }
 
-  Future<int> insertSegment(SegmentsCompanion segment) {
+  Future<int> insertSegment({
+    int? uid,
+    int? segmentIndex,
+    bool ackReceived = false,
+    Uint8List? payload,
+  }) async {
+    SegmentsCompanion segment = SegmentsCompanion.insert(
+      uid: uid!,
+      segmentIndex: segmentIndex!,
+      ackReceived: Value(ackReceived),
+      payload: payload ?? Uint8List(0),
+    );
     return db!.into(db!.segments).insert(segment);
   }
 
-  Stream<List<MessageWithSegments>> watchMessages(int destinationId) {
+  Stream<List<MessageWithSegments>> watchMessages(String status) {
     if (db == null) return Stream.empty();
 
-    final query = db!.select(db!.messages)
-      ..where((t) => t.destinationId.equals(destinationId))
-      ..orderBy([(t) => OrderingTerm.asc(t.timestamp)]);
+    final SimpleSelectStatement<$MessagesTable, Message> query =
+        db!.select(db!.messages)
+          ..where((m) => m.status.equals(status))
+          ..orderBy([(t) => OrderingTerm.asc(t.timestamp)]);
 
     return query.watch().asyncMap((messages) async {
       final results = <MessageWithSegments>[];
@@ -68,39 +99,67 @@ class DatabaseService {
     });
   }
 
+  Future<List<Segment>> getPendingSegments({int maxRetries = 3}) async {
+    if (db == null) return [];
+
+    return (db!.select(db!.segments)..where(
+          (s) =>
+              s.ackReceived.equals(false) &
+              s.retryCount.isSmallerThanValue(maxRetries),
+        ))
+        .get();
+  }
+
   Future<void> incrementSegmentRetry(Segment segment) async {
     if (db == null) return;
     await (db!.update(db!.segments)..where((s) => s.id.equals(segment.id)))
         .write(SegmentsCompanion(retryCount: Value(segment.retryCount + 1)));
   }
 
-  Future<void> markMessageAck(int uid) async {
+  Future<void> updateMessage(int uid, String text, String status) async {
     if (db == null) return;
 
-    final segmentsList = await (db!.select(
-      db!.segments,
-    )..where((s) => s.uid.equals(uid))).get();
-
-    if (segmentsList.any((s) => !s.ackReceived)) return;
-    await (db!.update(db!.messages)..where((s) => s.uid.equals(uid))).write(
-      MessagesCompanion(status: const Value('delivered')),
+    await (db!.update(db!.messages)..where((s) => s.id.equals(uid))).write(
+      MessagesCompanion(payload: Value(text), status: Value(text)),
     );
   }
 
-  Future<void> markSegmentAck(int segmentId) async {
+  Future<void> markSegmentAck(int uid, int segmentIndex) async {
     if (db == null) return;
 
-    await (db!.update(db!.segments)..where((s) => s.id.equals(segmentId)))
+    await (db!.update(db!.segments)..where(
+          (s) => (s.uid.equals(uid) & s.segmentIndex.equals(segmentIndex)),
+        ))
         .write(SegmentsCompanion(ackReceived: const Value(true)));
   }
 
-  Future<Segment> getSegment(int uid, int segmentIndex) async {
-    final seg = db!.select(db!.segments)
-      ..where((s) => s.uid.equals(uid) & s.segmentIndex.equals(segmentIndex));
-    return await seg.getSingle();
+  Future<void> markMessageAck(int uid, String text) async {
+    if (db == null) return;
+
+    await (db!.update(db!.messages)..where((m) => m.uid.equals(uid))).write(
+      MessagesCompanion(status: Value(text)),
+    );
   }
 
-  Future<bool> checkUID(int uid) async {
+  Future<Segment?> getSegmentExists(int uid, int segmentIndex) async {
+    final seg = db!.select(db!.segments)
+      ..where((s) => s.uid.equals(uid) & s.segmentIndex.equals(segmentIndex));
+    return await seg.getSingleOrNull();
+  }
+
+  Future<List<Segment>> getSegmentsForUid(int uid) {
+    return (db!.select(db!.segments)
+          ..where((s) => s.uid.equals(uid))
+          ..orderBy([(s) => OrderingTerm.asc(s.segmentIndex)]))
+        .get();
+  }
+
+  Future<Message> getMessage(int uid) async {
+    final msg = db!.select(db!.messages)..where((m) => m.uid.equals(uid));
+    return await msg.getSingle();
+  }
+
+  Future<bool> storedUID(int uid) async {
     final row = await (db!.select(
       db!.messages,
     )..where((t) => t.uid.equals(uid))).getSingleOrNull();

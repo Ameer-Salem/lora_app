@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:lora_app/service/database_service.dart';
 import 'package:lora_app/utilities/converter.dart';
 
 class BleService {
@@ -53,21 +52,23 @@ class BleService {
   }
 
   Future<void> sendPacket(
-    int type,
-    int sourceId,
-    int destinationId,
-    int totalSegments,
-    SegmentsCompanion seg,
-  ) async {
+    {int? type,
+    int sourceId = 0,
+    int destinationId = 0,
+    int uid = 0,
+    int totalSegments = 1,
+    int segmentIndex = 1,
+    Uint8List? payload,
+  }) async {
     final bytes = BytesBuilder();
-    final payloadLength = seg.payload.value.length;
+    final payloadLength = payload != null ? payload.length : 0;
 
-    bytes.add([type]);
+    bytes.add([type!]);
     bytes.add(Converter.intToUint8List(sourceId, 4));
     bytes.add(Converter.intToUint8List(destinationId, 4));
-    bytes.add(Converter.intToUint8List(seg.uid.value, 6));
-    bytes.add([seg.segmentIndex.value, totalSegments, payloadLength]);
-    bytes.add(seg.payload.value);
+    bytes.add(Converter.intToUint8List(uid, 6));
+    bytes.add([segmentIndex, totalSegments, payloadLength]);
+    bytes.add(payload ?? Uint8List(0));
 
     await writeCharacteristic!.write(bytes.toBytes());
   }
