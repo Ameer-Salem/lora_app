@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:lora_app/utilities/constants.dart';
 import 'package:lora_app/utilities/converter.dart';
 
 class BleService {
@@ -10,22 +12,12 @@ class BleService {
   List<BluetoothService> services = [];
   BluetoothCharacteristic? writeCharacteristic;
   BluetoothCharacteristic? notifyCharacteristic;
-  Stream<List<ScanResult>> scanResults() {
-    return FlutterBluePlus.scanResults;
+
+  Future<void> turnOn() async {
+    await FlutterBluePlus.turnOn();
   }
 
-  Future<void> startScan() async {
-    try {
-      await FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 5),
-        withServices: [serviceGUID],
-      );
-    } on Exception {
-      return;
-    }
-  }
-
-  Future<void> connect(BluetoothDevice device) async {
+  Future<void> connect(BluetoothDevice device, Position position) async {
     await device.connect(autoConnect: false, license: License.free);
     services = await device.discoverServices();
     for (var s in services) {
@@ -33,6 +25,9 @@ class BleService {
         if (c.uuid == writeGUID) {
           // Store write characteristic
           writeCharacteristic = c;
+          String payload =
+              "${Constants.locationTYPE},${position.latitude},${position.longitude}";
+          c.write(payload.codeUnits);
         }
         if (c.uuid == notifyGUID) {
           // Store notify characteristic and set up notifications
@@ -51,8 +46,8 @@ class BleService {
     return device.connectionState;
   }
 
-  Future<void> sendPacket(
-    {int? type,
+  Future<void> sendPacket({
+    int? type,
     int sourceId = 0,
     int destinationId = 0,
     int uid = 0,

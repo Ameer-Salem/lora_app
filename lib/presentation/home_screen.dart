@@ -9,63 +9,104 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final neighbors = ref.watch(neighborsProvider);
-    return SafeArea(
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Home'),
-          actions: [
-            IconButton(
-              onPressed: () =>
-                  ref.read(neighborsProvider.notifier).getNeighbors(),
-              icon: const Icon(Icons.person_search_rounded),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            Expanded(child: Container(color: Colors.green)),
-            SizedBox(
-              height: 500,
-              width: double.infinity,
-              child: ListView.builder(
-                itemCount: neighbors.length,
-                itemBuilder: (context, index) {
-                  return ListTile(
-                    leading: CircleAvatar(
-                      child: IconButton(
-                        onPressed: () {},
-                        icon: Icon(Icons.person),
-                      ),
-                    ),
-                    title: Text('User ${neighbors[index].id}'),
-                    subtitle: Text(
-                      'Message $index',
-                      style: TextStyle(color: Colors.grey),
-                    ),
-                    trailing: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          '10:00 AM',
-                          style: TextStyle(color: Colors.grey, fontSize: 13),
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text('Chats'),
+        actions: [
+          IconButton(
+            onPressed: () =>
+                ref.read(neighborsProvider.notifier).getNeighbors(),
+            icon: const Icon(Icons.search),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          Container(
+            padding: EdgeInsets.all(20),
+            height: MediaQuery.sizeOf(context).height / 2.5,
+            width: double.infinity,
+            child: Image.asset('assets/pngs/main screen.png'),
+          ),
+          SizedBox(height: 20),
+          Expanded(
+            child: neighbors.isEmpty
+                ? const Center(child: Text('No contacts found'))
+                : ListView.builder(
+                    itemCount: neighbors.length,
+                    itemBuilder: (context, index) {
+                      return ListTile(
+                        leading: GestureDetector(
+                          onTap: () {},
+                          child: CircleAvatar(
+                            child: Image.asset(
+                              'assets/avatars/Asset 2-8.png',
+                            ),
+                          ),
                         ),
-                      ],
-                    ),
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (BuildContext context) =>
-                              ChatScreen(neighbor: neighbors[index]),
+                        title: Text('User ${neighbors[index].id}'),
+                        subtitle: Text(
+                          'Message $index',
+                          style: TextStyle(color: Colors.grey),
                         ),
+                        trailing: SizedBox(
+                          width: 70,
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                '10:00 AM',
+                                style: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
+                              ),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                spacing: 5,
+                                children: [
+                                  Text(
+                                    neighbors[index].rssi.toString(),
+                                    style: TextStyle(fontSize: 13),
+                                  ),
+                                  if (neighbors[index].rssi < -100)
+                                    Icon(
+                                      Icons.signal_cellular_alt_1_bar_rounded,
+                                      color: Colors.red,
+                                    )
+                                  else if (neighbors[index].rssi <= -80)
+                                    Icon(
+                                      Icons.signal_cellular_alt_2_bar_rounded,
+                                      color: Colors.yellow,
+                                    )
+                                  else if (neighbors[index].rssi <= -1)
+                                    Icon(
+                                      Icons.signal_cellular_alt_rounded,
+                                      color: Colors.green,
+                                    )
+                                  else if (neighbors[index].rssi >= 0)
+                                    Icon(Icons.route, color: Colors.green),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (BuildContext context) =>
+                                  ChatScreen(neighbor: neighbors[index]),
+                            ),
+                          );
+                        },
                       );
                     },
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
+                  ),
+          ),
+        ],
       ),
     );
   }

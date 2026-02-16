@@ -36,8 +36,10 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   Future<void> connect(BluetoothDevice device) async {
     state = DeviceSession(status: ConnectionStatus.connecting);
     try {
-      await ref.read(bleServiceProvider).connect(device);
+      final position =  ref.read(locationProvider);
+      await ref.read(bleServiceProvider).connect(device , position!);
       await ref.read(databaseServiceProvider).openDatabase(device.remoteId.str);
+      
       _connectionSub?.cancel();
       _connectionSub = ref
           .read(bleServiceProvider)
@@ -51,6 +53,7 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
         status: ConnectionStatus.connected,
         device: Device(id: device.platformName, name: device.platformName),
       );
+       
       _startRetryLoop();
 
       _dataSub?.cancel();
@@ -98,11 +101,27 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   }
 
   Stream<List<ScanResult>> getScanResults() {
-    return ref.read(bleServiceProvider).scanResults();
+    final devices = <ScanResult>[];
+    final controller = StreamController<List<ScanResult>>();
+    FlutterBluePlus.scanResults.listen((results) {
+      for (var r in results) {
+        final exists = devices.any((d) => d.device.remoteId == r.device.remoteId);
+        if (!exists) devices.add(r);
+      }
+      controller.add(List.unmodifiable(devices)); // emit a copy
+    });
+    return controller.stream;
   }
 
   Future<void> startScan() async {
-    await ref.read(bleServiceProvider).startScan();
+    try {
+      FlutterBluePlus.startScan(
+        timeout: const Duration(seconds: 5),
+        withServices: [ref.read(bleServiceProvider).serviceGUID],
+      );
+    } on Exception {
+      return;
+    }
   }
 
   void _startRetryLoop() {

@@ -1,8 +1,6 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/logic/session_controller.dart';
 import 'package:lora_app/presentation/check_screen.dart';
@@ -20,10 +18,7 @@ void main() async {
     Permission.bluetoothAdvertise,
     Permission.location,
   ].request();
-  bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-  if (!serviceEnabled) {
-    await Geolocator.openLocationSettings();
-  }
+
   runApp(ProviderScope(child: const MyApp()));
 }
 
@@ -36,15 +31,39 @@ class MyApp extends ConsumerWidget {
     final services = ref.watch(servicesStatusProvider);
 
     return MaterialApp(
-      home: session.status == ConnectionStatus.connected ? HomeScreen() : services.when(
-        loading: () => null,
-        error: (e, _) => null,
-        data: (status) {
-          return (status == ServicesStatus.ready)
-              ? ScanScreen()
-              : CheckScreen();
-        },
-      ),
+      debugShowCheckedModeBanner: false,
+      home: session.status == ConnectionStatus.connected
+          ? HomeScreen()
+          : services.when(
+              loading: () => null,
+              error: (e, _) => null,
+              data: (status) {
+                return (status == ServicesStatus.ready)
+                    ? ScanScreen()
+                    : CheckScreen();
+              },
+            ),
     );
   }
 }
+// class OfflineMap extends StatelessWidget {
+//   const OfflineMap({super.key});
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return FlutterMap(
+//       options: MapOptions(
+//         initialCenter: LatLng(32.05277,44.32841),
+//         initialZoom: 13,
+//       ),
+//       children: [
+//         TileLayer(
+//           tileProvider: MbTilesTileProvider.fromPath(
+//             path: 'assets/maps/najaf.mbtiles',
+//           ),
+//         ),
+//       ],
+//     );
+//   }
+// }
+
