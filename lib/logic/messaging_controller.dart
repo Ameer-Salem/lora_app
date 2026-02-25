@@ -34,15 +34,17 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
   void watchMessages(int destinationId) {
     _sub?.cancel();
     state = const AsyncValue.loading();
-    _sub = _db
-        .watchMessages(Constants.delivered)
-        .listen(
-          (messages) => state = AsyncValue.data(
-            messages
-              ..where((x) => x.message.destinationId == destinationId).toList(),
-          ),
-          onError: (e, _) => state = AsyncValue.error(e, StackTrace.current),
-        );
+    _sub = _db.watchMessages(Constants.pending).listen((messages) {
+      if (messages.isEmpty) return;
+      print(messages[0].message.destinationId);
+      print(messages[0].message.sourceId);
+      print(destinationId);
+      state = AsyncValue.data(
+        messages
+            .where((x) => x.message.destinationId == destinationId)
+            .toList(),
+      );
+    }, onError: (e, _) => state = AsyncValue.error(e, StackTrace.current));
   }
 
   void onTextPacket(Packet packet) async {

@@ -9,6 +9,7 @@ class BleService {
   Guid serviceGUID = Guid('ffffffff-ffff-ffff-ffff-ffffffffffff');
   Guid notifyGUID = Guid('ffffffff-ffff-ffff-ffff-fffffffffff0');
   Guid writeGUID = Guid('ffffffff-ffff-ffff-ffff-fffffffff000');
+  int? deviceID;
   List<BluetoothService> services = [];
   BluetoothCharacteristic? writeCharacteristic;
   BluetoothCharacteristic? notifyCharacteristic;
@@ -19,6 +20,7 @@ class BleService {
 
   Future<void> connect(BluetoothDevice device, Position position) async {
     await device.connect(autoConnect: false, license: License.free);
+    deviceID = int.parse(device.platformName);
     services = await device.discoverServices();
     for (var s in services) {
       for (var c in s.characteristics) {
@@ -27,7 +29,8 @@ class BleService {
           writeCharacteristic = c;
           String payload =
               "${Constants.locationTYPE},${position.latitude},${position.longitude}";
-          c.write(payload.codeUnits);
+          await c.device.requestMtu(220);
+          c.write(payload.codeUnits,allowLongWrite: true);
         }
         if (c.uuid == notifyGUID) {
           // Store notify characteristic and set up notifications

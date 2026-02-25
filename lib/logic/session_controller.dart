@@ -36,11 +36,10 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   Future<void> connect(BluetoothDevice device) async {
     state = DeviceSession(status: ConnectionStatus.connecting);
     try {
-      final position =  ref.read(locationProvider);
-      await ref.read(bleServiceProvider).connect(device , position!);
-      await device.requestMtu(247);
+      final position = ref.read(locationProvider);
+      await ref.read(bleServiceProvider).connect(device, position!);
       await ref.read(databaseServiceProvider).openDatabase(device.remoteId.str);
-      
+      device.requestMtu(512);
       _connectionSub?.cancel();
       _connectionSub = ref
           .read(bleServiceProvider)
@@ -54,38 +53,38 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
         status: ConnectionStatus.connected,
         device: Device(id: device.platformName, name: device.platformName),
       );
-       
+
       _startRetryLoop();
 
       _dataSub?.cancel();
-      _dataSub = ref
-          .read(bleServiceProvider)
-          .notifyCharacteristic!
-          .onValueReceived
-          .listen((values) {
-            final data = Uint8List.fromList(values);
-            switch (data[0]) {
-              case Constants.ackTYPE:
-                final Packet packet = Packet.fromBytes(data)!;
-                // ACK packet
-                ref.read(messagesProvider.notifier).onACKPacket(packet);
-                break;
-              case Constants.textTYPE:
-                final Packet packet = Packet.fromBytes(data)!;
-                // Text packet
-                ref.read(messagesProvider.notifier).onTextPacket(packet);
-                break;
-              case Constants.neighborsTYPE:
-                // Neighbors packet
+      final ble = ref.read(bleServiceProvider);
 
-                ref.read(neighborsProvider.notifier).updateFromPacket(data);
+      // wait until characteristic exists
+      while (ble.notifyCharacteristic == null) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      _dataSub = ble.notifyCharacteristic!.onValueReceived.listen((values) {
+        final data = Uint8List.fromList(values);
+        final Packet packet = Packet.fromBytes(data)!;
+        switch (data[0]) {
+          case Constants.ackTYPE:
+            // ACK packet
+            ref.read(messagesProvider.notifier).onACKPacket(packet);
+            break;
+          case Constants.textTYPE:
+            // Text packet
+            ref.read(messagesProvider.notifier).onTextPacket(packet);
+            break;
+          case Constants.neighborsTYPE:
+            // Neighbors packet
+            ref.read(neighborsProvider.notifier).updateFromPacket(data);
+            break;
 
-                break;
-              default:
-                // Unknown packet
-                break;
-            }
-          });
+          default:
+            // Unknown packet
+            break;
+        }
+      });
     } catch (e) {
       return;
     }
@@ -106,7 +105,9 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     final controller = StreamController<List<ScanResult>>();
     FlutterBluePlus.scanResults.listen((results) {
       for (var r in results) {
-        final exists = devices.any((d) => d.device.remoteId == r.device.remoteId);
+        final exists = devices.any(
+          (d) => d.device.remoteId == r.device.remoteId,
+        );
         if (!exists) devices.add(r);
       }
       controller.add(List.unmodifiable(devices)); // emit a copy

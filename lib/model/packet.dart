@@ -39,8 +39,7 @@ class Packet {
     if (data.length < 2) return null;
 
     int offset = 0;
-    final type = data[offset];
-    offset += 1;
+    final type = data[offset++];
     final sourceId = Converter.uint8ListToInt(
       data.sublist(offset, offset + 4), 4
     );

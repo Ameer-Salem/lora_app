@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lora_app/logic/messaging_controller.dart';
+import 'package:lora_app/logic/providers.dart';
+import 'package:lora_app/model/message_bubble.dart';
 import 'package:lora_app/model/neighbor.dart';
 import 'package:lora_app/utilities/colors.dart';
-import 'package:lora_app/utilities/constants.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
   final Neighbor neighbor;
@@ -109,9 +110,15 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
                           final msg = messages[index];
-                          return msg.message.type == Constants.textTYPE
-                              ? Text('${msg.message.payload}')
-                              : Text('');
+                          return MessageBubble(
+                            sourceId: msg.message.sourceId,
+                            connectedDeviceId: ref
+                                .read(bleServiceProvider)
+                                .deviceID!,
+                            timestamp: msg.message.timestamp,
+                            text: msg.message.payload ?? '',
+                            status: msg.message.status,
+                          );
                         },
                       ),
                 error: (e, _) => Center(child: Text('Error: $e')),

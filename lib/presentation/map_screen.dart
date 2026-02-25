@@ -11,10 +11,10 @@ class MapScreen extends ConsumerWidget {
   final List<Neighbor> neighbors;
 
   const MapScreen({super.key, required this.neighbors});
-  
+
   @override
-  Widget build(BuildContext context,WidgetRef ref) {
-    final position =  ref.watch(locationProvider)!;
+  Widget build(BuildContext context, WidgetRef ref) {
+    final position = ref.watch(locationProvider)!;
     return Scaffold(
       appBar: AppBar(title: const Text('Map')),
       body: FlutterMap(
@@ -30,20 +30,25 @@ class MapScreen extends ConsumerWidget {
           ),
 
           MarkerLayer(
-            markers: neighbors.where((n) => n.lat != null && n.lon != null).map(
-              (n) {
+            markers: [
+              Marker(
+                point: LatLng(position.latitude, position.longitude),
+                child: const Icon(Icons.location_on, color: MyColors.purple),
+              ),
+              ...(neighbors.where((n) => n.lat != null && n.lon != null).map((
+                n,
+              ) {
                 return Marker(
                   width: 20,
                   height: 20,
                   point: LatLng(n.lat!, n.lon!),
-                  child: const Icon(Icons.location_on, color: MyColors.purple),
+                  child: const Icon(Icons.location_on, color: MyColors.yellow),
                 );
-              },
-            ).toList(),
+              }).toList()),
+            ],
           ),
         ],
       ),
     );
   }
 }
-
