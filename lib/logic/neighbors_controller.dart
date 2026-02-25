@@ -5,6 +5,7 @@ import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/model/neighbor.dart';
 import 'package:lora_app/service/ble_service.dart';
 import 'package:lora_app/utilities/constants.dart';
+import 'package:lora_app/utilities/converter.dart';
 
 final neighborsProvider = NotifierProvider<NeighborsNotifier, List<Neighbor>>(
   NeighborsNotifier.new,
@@ -46,7 +47,12 @@ class NeighborsNotifier extends Notifier<List<Neighbor>> {
       final lastSeen = bytes.buffer.asByteData().getUint32(offset, Endian.big);
       offset += 4;
 
-      neighbors.add(Neighbor(id, rssi, lastSeen));
+      final latitude = Converter.bytesToFloatBE(bytes, offset);
+      offset += 4;
+      final longitude = Converter.bytesToFloatBE(bytes, offset);
+      offset += 4;
+
+      neighbors.add(Neighbor(id, rssi, lastSeen , latitude, longitude));
       state = neighbors;
     }
 

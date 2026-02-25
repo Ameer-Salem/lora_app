@@ -38,6 +38,7 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     try {
       final position =  ref.read(locationProvider);
       await ref.read(bleServiceProvider).connect(device , position!);
+      await device.requestMtu(247);
       await ref.read(databaseServiceProvider).openDatabase(device.remoteId.str);
       
       _connectionSub?.cancel();
@@ -127,7 +128,7 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   void _startRetryLoop() {
     _retryTimer?.cancel();
 
-    _retryTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+    _retryTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       if (state.status != ConnectionStatus.connected) return;
 
       final db = ref.read(databaseServiceProvider);

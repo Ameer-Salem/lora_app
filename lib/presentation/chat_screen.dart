@@ -160,6 +160,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       ref
                           .read(messagesProvider.notifier)
                           .sendText(widget.neighbor.id, controller.text);
+                      controller.clear();
                     },
                     icon: Icon(Icons.arrow_upward_rounded),
                   ),

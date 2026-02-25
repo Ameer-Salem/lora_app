@@ -40,12 +40,12 @@ class DatabaseService {
   }
 
   Future<int> insertMessage({
-    int? type,
-    int? sourceId,
-    int? destinationId,
-    int? uid,
+    required int? type,
+    required int? sourceId,
+    required int? destinationId,
+    required int? uid,
+    required String? status,
     int? totalSegments,
-    String? status,
     Uint8List? payload,
   }) async {
     MessagesCompanion message = MessagesCompanion.insert(

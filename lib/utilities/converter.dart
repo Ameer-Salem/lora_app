@@ -26,4 +26,9 @@ class Converter {
     }
     return bytes;
   }
+
+  static double bytesToFloatBE(Uint8List data, int offset) {
+    final byteData = ByteData.sublistView(data, offset, offset + 4);
+    return byteData.getFloat32(0, Endian.big);
+  }
 }

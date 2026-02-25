@@ -54,6 +54,7 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
         destinationId: packet.destinationId,
         uid: packet.uid,
         totalSegments: packet.totalSegments,
+        status: Constants.pending,
       );
     }
     if (await _db.getSegmentExists(packet.uid, packet.segmentIndex) == null) {
@@ -108,6 +109,7 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
       uid: uid,
       totalSegments: totalSegments,
       payload: bytes,
+      status: Constants.pending,
     );
 
     for (var i = 0; i < bytes.length; i += Constants.segmentSize) {

@@ -15,7 +15,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
   @override
   void initState() {
     super.initState();
-     _timer = Timer.periodic(Duration(seconds: 2), (_) => ref.read(connectionStatusProvider.notifier).startScan());
+     _timer = Timer.periodic(Duration(seconds: 8), (_) => ref.read(connectionStatusProvider.notifier).startScan());
     // run AFTER first frame to avoid build conflicts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ref.read(connectionStatusProvider.notifier).startScan();

@@ -5,5 +5,5 @@ class Neighbor {
   double? lat;
   double? lon;
 
-  Neighbor(this.id, this.rssi, this.lastSeen);
+  Neighbor(this.id, this.rssi, this.lastSeen , this.lat, this.lon);
 }
