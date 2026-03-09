@@ -31,6 +31,7 @@ class NeighborsNotifier extends Notifier<List<Neighbor>> {
     await _ble.writeCharacteristic!.write([Constants.neighborsTYPE]);
   }
 
+ 
   List<Neighbor> onNeighborsPacket(Uint8List bytes) {
     int offset = 1;
 
@@ -52,7 +53,7 @@ class NeighborsNotifier extends Notifier<List<Neighbor>> {
       final longitude = Converter.bytesToFloatBE(bytes, offset);
       offset += 4;
 
-      neighbors.add(Neighbor(id, rssi, lastSeen , latitude, longitude));
+      neighbors.add(Neighbor(id, rssi, lastSeen, latitude, longitude));
       state = neighbors;
     }
 

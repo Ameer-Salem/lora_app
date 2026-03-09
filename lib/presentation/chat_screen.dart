@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lora_app/logic/messaging_controller.dart';
+import 'package:lora_app/logic/neighbors_controller.dart';
 import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/model/message_bubble.dart';
-import 'package:lora_app/model/neighbor.dart';
 import 'package:lora_app/utilities/colors.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
-  final Neighbor neighbor;
-  const ChatScreen({super.key, required this.neighbor});
+  final int id;
+  const ChatScreen({super.key, required this.id});
 
   @override
   ConsumerState<ChatScreen> createState() => _ChatScreenState();
@@ -16,17 +16,29 @@ class ChatScreen extends ConsumerStatefulWidget {
 
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   TextEditingController controller = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     Future.microtask(() {
-      ref.read(messagesProvider.notifier).watchMessages(widget.neighbor.id);
+      ref.watch(messagesProvider.notifier).watchMessages(widget.id);
+    });
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      }
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final neighbor = ref
+        .watch(neighborsProvider)
+        .firstWhere((n) => n.id == widget.id);
     final messageState = ref.watch(messagesProvider);
     return GestureDetector(
       onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -52,10 +64,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'User ${widget.neighbor.id}',
-                    style: TextStyle(fontSize: 16),
-                  ),
+                  Text('User ${neighbor.id}', style: TextStyle(fontSize: 16)),
                   Text(
                     'online',
                     style: TextStyle(fontSize: 13, color: Colors.green[300]),
@@ -71,28 +80,28 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  if (widget.neighbor.rssi < -100)
+                  if (neighbor.rssi < -100)
                     Icon(
                       Icons.signal_cellular_alt_1_bar_rounded,
                       size: 20,
                       color: Colors.red,
                     ),
-                  if (widget.neighbor.rssi <= -80)
+                  if (neighbor.rssi <= -80)
                     Icon(
                       Icons.signal_cellular_alt_2_bar_rounded,
                       size: 20,
                       color: Colors.yellow,
                     ),
-                  if (widget.neighbor.rssi <= -1)
+                  if (neighbor.rssi <= -1)
                     Icon(
                       Icons.signal_cellular_alt_rounded,
                       size: 20,
                       color: Colors.green,
                     ),
-                  if (widget.neighbor.rssi >= 0)
+                  if (neighbor.rssi >= 0)
                     Icon(Icons.route, size: 20, color: Colors.green),
                   Text(
-                    widget.neighbor.rssi.toString(),
+                    neighbor.rssi.toString(),
                     style: TextStyle(fontSize: 12),
                   ),
                 ],
@@ -107,8 +116,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 data: (messages) => messages.isEmpty
                     ? const Center(child: Text('No messages'))
                     : ListView.builder(
+                        controller: _scrollController,
                         itemCount: messages.length,
                         itemBuilder: (context, index) {
+                          _scrollToBottom();
                           final msg = messages[index];
                           return MessageBubble(
                             sourceId: msg.message.sourceId,
@@ -122,7 +133,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         },
                       ),
                 error: (e, _) => Center(child: Text('Error: $e')),
-                loading: () => const Center(child: CircularProgressIndicator()),
+                loading: () => const Center(child: Text('No messages')),
               ),
             ),
             Container(
@@ -164,9 +175,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       backgroundColor: WidgetStatePropertyAll(MyColors.purple),
                     ),
                     onPressed: () {
+                      if (controller.text.isEmpty) return;
                       ref
                           .read(messagesProvider.notifier)
-                          .sendText(widget.neighbor.id, controller.text);
+                          .sendText(neighbor.id, controller.text);
                       controller.clear();
                     },
                     icon: Icon(Icons.arrow_upward_rounded),

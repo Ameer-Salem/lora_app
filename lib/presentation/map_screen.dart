@@ -3,7 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_mbtiles/flutter_map_mbtiles.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:lora_app/logic/providers.dart';
+import 'package:lora_app/logic/location_controller.dart';
 import 'package:lora_app/model/neighbor.dart';
 import 'package:lora_app/utilities/colors.dart';
 

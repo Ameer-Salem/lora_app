@@ -1,22 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lora_app/logic/neighbors_controller.dart';
+import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/presentation/chat_screen.dart';
+import 'package:lora_app/presentation/neighbors_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final neighbors = ref.watch(neighborsProvider);
+    final id = ref.read(bleServiceProvider).deviceID!;
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
         title: const Text('Chats'),
         actions: [
           IconButton(
-            onPressed: () =>
-                ref.read(neighborsProvider.notifier).getNeighbors(),
+            onPressed: () {
+              ref.read(neighborsProvider.notifier).getNeighbors();
+              Navigator.push(
+                context,
+                MaterialPageRoute<void>(
+                  builder: (BuildContext context) => NeighborsScreen(),
+                ),
+              );
+            },
             icon: const Icon(Icons.search),
           ),
         ],
@@ -31,80 +40,50 @@ class HomeScreen extends ConsumerWidget {
           ),
           SizedBox(height: 20),
           Expanded(
-            child: neighbors.isEmpty
-                ? const Center(child: Text('No contacts found'))
-                : ListView.builder(
-                    itemCount: neighbors.length,
-                    itemBuilder: (context, index) {
+            child: StreamBuilder(
+              stream: ref
+                  .watch(databaseServiceProvider)
+                  .getLatestMessages(id),
+              builder: (_, snapshot) {
+                final messages = snapshot.data ?? [];
+                if (snapshot.hasData) {
+                  return ListView.builder(
+                    itemCount: messages.length,
+                    itemBuilder: (_, index)  {
+                      final msg = messages[index];
+                      final int otherId =
+                          msg.sourceId == ref.read(bleServiceProvider).deviceID
+                          ? msg.destinationId
+                          : msg.sourceId;
                       return ListTile(
-                        leading: GestureDetector(
-                          onTap: () {},
-                          child: CircleAvatar(
-                            child: Image.asset(
-                              'assets/avatars/Asset 2-8.png',
-                            ),
-                          ),
-                        ),
-                        title: Text('User ${neighbors[index].id}'),
-                        subtitle: Text(
-                          'Message $index',
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                        trailing: SizedBox(
-                          width: 70,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Text(
-                                '10:00 AM',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                spacing: 5,
-                                children: [
-                                  Text(
-                                    neighbors[index].rssi.toString(),
-                                    style: TextStyle(fontSize: 13),
-                                  ),
-                                  if (neighbors[index].rssi < -100)
-                                    Icon(
-                                      Icons.signal_cellular_alt_1_bar_rounded,
-                                      color: Colors.red,
-                                    )
-                                  else if (neighbors[index].rssi <= -80)
-                                    Icon(
-                                      Icons.signal_cellular_alt_2_bar_rounded,
-                                      color: Colors.yellow,
-                                    )
-                                  else if (neighbors[index].rssi <= -1)
-                                    Icon(
-                                      Icons.signal_cellular_alt_rounded,
-                                      color: Colors.green,
-                                    )
-                                  else if (neighbors[index].rssi >= 0)
-                                    Icon(Icons.route, color: Colors.green),
-                                ],
-                              ),
-                            ],
-                          ),
+                        title: Text(
+                          'User $otherId',
+                        ), // replace with username if needed
+                        subtitle: Text(msg.payload ?? 'no message yet'),
+                        trailing: Text(
+                          DateTime.fromMillisecondsSinceEpoch(
+                            msg.timestamp * 1000,
+                          ).toLocal().toString(),
                         ),
                         onTap: () {
+                          
                           Navigator.push(
                             context,
                             MaterialPageRoute<void>(
-                              builder: (BuildContext context) =>
-                                  ChatScreen(neighbor: neighbors[index]),
+                              builder: (BuildContext context) {
+                                return ChatScreen(id: id);
+                              },
                             ),
                           );
                         },
                       );
                     },
-                  ),
+                  );
+                } else {
+                  return const Text('No messages');
+                }
+              },
+            ),
           ),
         ],
       ),

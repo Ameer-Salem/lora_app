@@ -3,11 +3,14 @@ import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:lora_app/logic/location_controller.dart';
 import 'package:lora_app/logic/messaging_controller.dart';
 import 'package:lora_app/logic/neighbors_controller.dart';
 import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/model/device.dart';
 import 'package:lora_app/model/packet.dart';
+import 'package:lora_app/service/ble_service.dart';
+import 'package:lora_app/service/database_service.dart';
 import 'package:lora_app/utilities/constants.dart';
 
 enum ConnectionStatus { disconnected, connecting, connected }
@@ -27,9 +30,16 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   StreamSubscription? _connectionSub;
   StreamSubscription? _dataSub;
   Timer? _retryTimer;
+  Timer? _neighborTimer;
+  late BleService ble;
+  late DatabaseService db;
+  late NeighborsNotifier neighborProvider;
 
   @override
   DeviceSession build() {
+    ble = ref.read(bleServiceProvider);
+    db = ref.read(databaseServiceProvider);
+    neighborProvider = ref.read(neighborsProvider.notifier);
     return const DeviceSession.disconnected();
   }
 
@@ -37,47 +47,44 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     state = DeviceSession(status: ConnectionStatus.connecting);
     try {
       final position = ref.read(locationProvider);
-      await ref.read(bleServiceProvider).connect(device, position!);
-      await ref.read(databaseServiceProvider).openDatabase(device.remoteId.str);
+      await ble.connect(device, position!);
+      await db.openDatabase(device.remoteId.str);
       device.requestMtu(512);
       _connectionSub?.cancel();
-      _connectionSub = ref
-          .read(bleServiceProvider)
-          .connectionState(device)
-          .listen((stateUpdate) {
-            if (stateUpdate == BluetoothConnectionState.disconnected) {
-              disconnect();
-            }
-          });
+      _connectionSub = ble.connectionState(device).listen((stateUpdate) {
+        if (stateUpdate == BluetoothConnectionState.disconnected) {
+          disconnect();
+        }
+      });
       state = DeviceSession(
         status: ConnectionStatus.connected,
         device: Device(id: device.platformName, name: device.platformName),
       );
 
-      _startRetryLoop();
-
       _dataSub?.cancel();
-      final ble = ref.read(bleServiceProvider);
-
       // wait until characteristic exists
       while (ble.notifyCharacteristic == null) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
+      _startRetryLoop();
+      _startNeighborsGetter();
+      final messageProvider = ref.read(messagesProvider.notifier);
       _dataSub = ble.notifyCharacteristic!.onValueReceived.listen((values) {
         final data = Uint8List.fromList(values);
-        final Packet packet = Packet.fromBytes(data)!;
         switch (data[0]) {
           case Constants.ackTYPE:
             // ACK packet
-            ref.read(messagesProvider.notifier).onACKPacket(packet);
+            final Packet packet = Packet.fromBytes(data)!;
+            messageProvider.onACKPacket(packet);
             break;
           case Constants.textTYPE:
             // Text packet
-            ref.read(messagesProvider.notifier).onTextPacket(packet);
+            final Packet packet = Packet.fromBytes(data)!;
+            messageProvider.onTextPacket(packet);
             break;
           case Constants.neighborsTYPE:
             // Neighbors packet
-            ref.read(neighborsProvider.notifier).updateFromPacket(data);
+            neighborProvider.updateFromPacket(data);
             break;
 
           default:
@@ -93,10 +100,12 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   Future<void> disconnect() async {
     _retryTimer?.cancel();
     _retryTimer = null;
+    _neighborTimer?.cancel();
+    _neighborTimer = null;
     _connectionSub?.cancel();
     _connectionSub = null;
-    ref.read(neighborsProvider.notifier).clear();
-    await ref.read(databaseServiceProvider).closeDatabase();
+    neighborProvider.clear;
+    await db.closeDatabase();
     state = const DeviceSession.disconnected();
   }
 
@@ -132,9 +141,6 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     _retryTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       if (state.status != ConnectionStatus.connected) return;
 
-      final db = ref.read(databaseServiceProvider);
-      final ble = ref.read(bleServiceProvider);
-
       final segments = await db.getPendingSegments(
         maxRetries: Constants.maxRetries,
       );
@@ -156,6 +162,17 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
         // keep the radio happy
         await Future.delayed(const Duration(milliseconds: 130));
       }
+    });
+  }
+
+  void _startNeighborsGetter() {
+
+    _neighborTimer?.cancel();
+    _neighborTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (state.status != ConnectionStatus.connected) return;
+      await neighborProvider.getNeighbors();
+      // keep the radio happy
+      await Future.delayed(const Duration(milliseconds: 130));
     });
   }
 }

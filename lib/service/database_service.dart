@@ -29,6 +29,30 @@ LazyDatabase _openConnection(String deviceId) {
 class DatabaseService {
   AppDatabase? db;
 
+  Stream<List> getLatestMessages(int myId) {
+    return db!.select(db!.messages).watch().map((allMessages) {
+      final Map<int, Message> lastMessages = {};
+
+      for (var msg in allMessages) {
+        // figure out the other user
+        final otherId = msg.sourceId == myId ? msg.destinationId : msg.sourceId;
+
+        // check if we already have a message for this user
+        final current = lastMessages[otherId];
+
+        // keep only the newest message
+        if (current == null || msg.timestamp > current.timestamp) {
+          lastMessages[otherId] = msg;
+        }
+      }
+
+      // return the newest message per conversation, sorted by time
+      final list = lastMessages.values.toList();
+      list.sort((a, b) => b.timestamp.compareTo(a.timestamp));
+      return list;
+    });
+  }
+
   Future<void> closeDatabase() async {
     await db?.close();
     db = null;
@@ -81,7 +105,6 @@ class DatabaseService {
 
     final SimpleSelectStatement<$MessagesTable, Message> query =
         db!.select(db!.messages)
-          ..where((m) => m.status.equals(status))
           ..orderBy([(t) => OrderingTerm.asc(t.timestamp)]);
 
     return query.watch().asyncMap((messages) async {
@@ -119,7 +142,7 @@ class DatabaseService {
   Future<void> updateMessage(int uid, String text, String status) async {
     if (db == null) return;
 
-    await (db!.update(db!.messages)..where((s) => s.id.equals(uid))).write(
+    await (db!.update(db!.messages)..where((s) => s.uid.equals(uid))).write(
       MessagesCompanion(payload: Value(text), status: Value(text)),
     );
   }

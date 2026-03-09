@@ -33,7 +33,6 @@ class BleService {
           c.write(payload.codeUnits,allowLongWrite: true);
         }
         if (c.uuid == notifyGUID) {
-          // Store notify characteristic and set up notifications
           notifyCharacteristic = c;
           await c.setNotifyValue(true);
         }
@@ -68,6 +67,6 @@ class BleService {
     bytes.add([segmentIndex, totalSegments, payloadLength]);
     bytes.add(payload ?? Uint8List(0));
 
-    await writeCharacteristic!.write(bytes.toBytes());
+    await writeCharacteristic!.write(bytes.toBytes() ,allowLongWrite: true);
   }
 }

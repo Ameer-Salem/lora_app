@@ -34,14 +34,16 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
   void watchMessages(int destinationId) {
     _sub?.cancel();
     state = const AsyncValue.loading();
-    _sub = _db.watchMessages(Constants.pending).listen((messages) {
+    _sub = _db.watchMessages(Constants.delivered).listen((messages) {
       if (messages.isEmpty) return;
-      print(messages[0].message.destinationId);
-      print(messages[0].message.sourceId);
-      print(destinationId);
+
       state = AsyncValue.data(
         messages
-            .where((x) => x.message.destinationId == destinationId)
+            .where(
+              (x) =>
+                  x.message.destinationId == destinationId ||
+                  x.message.sourceId == destinationId,
+            )
             .toList(),
       );
     }, onError: (e, _) => state = AsyncValue.error(e, StackTrace.current));
@@ -71,27 +73,33 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
         .read(bleServiceProvider)
         .sendPacket(
           type: Constants.ackTYPE,
+          sourceId: packet.destinationId,
+          destinationId: packet.sourceId,
           uid: packet.uid,
           segmentIndex: packet.segmentIndex,
+          totalSegments: packet.totalSegments,
         );
     final segments = await _db.getSegmentsForUid(packet.uid);
     if (segments.length != packet.totalSegments) return;
-
     final buffer = BytesBuilder();
     for (final s in segments) {
       buffer.add(s.payload);
     }
     final fullBytes = buffer.toBytes();
     final text = utf8.decode(fullBytes);
-
     await _db.updateMessage(packet.uid, text, Constants.delivered);
   }
 
   void onACKPacket(Packet packet) async {
     await _db.markSegmentAck(packet.uid, packet.segmentIndex);
     final segments = await _db.getSegmentsForUid(packet.uid);
+    print('''
+    ack for ${packet.uid}
+    ${segments.length}
+    ${packet.segmentIndex}
+    ${packet.totalSegments}
+      ''');
     if (segments.length != packet.totalSegments) return;
-
     await _db.markMessageAck(packet.uid, Constants.delivered);
   }
 
@@ -115,7 +123,7 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
     );
 
     for (var i = 0; i < bytes.length; i += Constants.segmentSize) {
-      final segmentIndex = i ~/ Constants.segmentSize;
+      final segmentIndex = i ~/ Constants.segmentSize + 1;
       final end = (i + Constants.segmentSize < bytes.length)
           ? i + Constants.segmentSize
           : bytes.length;
@@ -126,7 +134,12 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
         segmentIndex: segmentIndex,
         payload: payload,
       );
+      print('''
+sending packet ${uid}
 
+      ${segmentIndex}
+      ${totalSegments}
+      ''');
       await ref
           .read(bleServiceProvider)
           .sendPacket(
