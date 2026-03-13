@@ -73,7 +73,7 @@ class NeighborsScreen extends ConsumerWidget {
                       context,
                       MaterialPageRoute<void>(
                         builder: (BuildContext context) =>
-                            ChatScreen(id: neighbors[index].id),
+                            ChatScreen(otherId: neighbors[index].id),
                       ),
                     );
                   },

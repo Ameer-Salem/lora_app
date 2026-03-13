@@ -1,6 +1,6 @@
+import 'package:uuid/uuid.dart';
 import 'dart:typed_data';
 
-import 'package:uuid/uuid.dart';
 
 class GetUUID {
   // take first 6 bytes = 48 bits

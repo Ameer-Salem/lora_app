@@ -1,7 +1,7 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/logic/session_controller.dart';
 import 'package:lora_app/model/message_with_segments.dart';
@@ -31,7 +31,7 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
     return const AsyncValue.loading();
   }
 
-  void watchMessages(int destinationId) {
+  void watchMessages(int destinationId)  {
     _sub?.cancel();
     state = const AsyncValue.loading();
     _sub = _db.watchMessages(Constants.delivered).listen((messages) {
@@ -93,17 +93,13 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
   void onACKPacket(Packet packet) async {
     await _db.markSegmentAck(packet.uid, packet.segmentIndex);
     final segments = await _db.getSegmentsForUid(packet.uid);
-    print('''
-    ack for ${packet.uid}
-    ${segments.length}
-    ${packet.segmentIndex}
-    ${packet.totalSegments}
-      ''');
+    
     if (segments.length != packet.totalSegments) return;
     await _db.markMessageAck(packet.uid, Constants.delivered);
   }
 
   Future<void> sendText(int destinationId, String text) async {
+    if( await _db.getUser(destinationId) == null) _db.insertOrUpdateUser(address: destinationId);
     final bytes = Uint8List.fromList(utf8.encode(text));
     final sourceId = ref.read(connectionStatusProvider).device!.id;
     int uid;
@@ -134,12 +130,7 @@ class MessagesNotifier extends Notifier<AsyncValue<List<MessageWithSegments>>> {
         segmentIndex: segmentIndex,
         payload: payload,
       );
-      print('''
-sending packet ${uid}
-
-      ${segmentIndex}
-      ${totalSegments}
-      ''');
+      
       await ref
           .read(bleServiceProvider)
           .sendPacket(

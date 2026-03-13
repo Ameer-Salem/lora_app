@@ -1,12 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:lora_app/logic/neighbors_controller.dart';
 import 'package:lora_app/logic/providers.dart';
 import 'package:lora_app/presentation/chat_screen.dart';
 import 'package:lora_app/presentation/neighbors_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
+  String formatTimestamp(DateTime time) {
+    final now = DateTime.now();
+    final difference = now.difference(time);
+
+    if (difference.inHours < 24) {
+      // hh:mm
+      final h = time.hour.toString().padLeft(2, '0');
+      final m = time.minute.toString().padLeft(2, '0');
+      return '$h:$m';
+    } else {
+      // MonthName dd
+      const months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
+
+      final monthName = months[time.month - 1];
+      final day = time.day.toString().padLeft(2, '0');
+      return '$monthName $day';
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -18,7 +48,6 @@ class HomeScreen extends ConsumerWidget {
         actions: [
           IconButton(
             onPressed: () {
-              ref.read(neighborsProvider.notifier).getNeighbors();
               Navigator.push(
                 context,
                 MaterialPageRoute<void>(
@@ -41,37 +70,36 @@ class HomeScreen extends ConsumerWidget {
           SizedBox(height: 20),
           Expanded(
             child: StreamBuilder(
-              stream: ref
-                  .watch(databaseServiceProvider)
-                  .getLatestMessages(id),
+              stream: ref.watch(databaseServiceProvider).watchUsersWithLatestMessage(id),
               builder: (_, snapshot) {
-                final messages = snapshot.data ?? [];
+                final usersWithmessages = snapshot.data ?? [];
                 if (snapshot.hasData) {
                   return ListView.builder(
-                    itemCount: messages.length,
-                    itemBuilder: (_, index)  {
-                      final msg = messages[index];
-                      final int otherId =
-                          msg.sourceId == ref.read(bleServiceProvider).deviceID
-                          ? msg.destinationId
-                          : msg.sourceId;
+                    itemCount: usersWithmessages.length,
+                    itemBuilder: (_, index) {
+                      final item = usersWithmessages[index];
+                      final msg = item.lastMessage;
+                      final user = item.user;
                       return ListTile(
                         title: Text(
-                          'User $otherId',
+                          user.name ?? 'User ${user.address}',
                         ), // replace with username if needed
-                        subtitle: Text(msg.payload ?? 'no message yet'),
+                        subtitle: Text(
+                          msg.payload ?? 'no message yet',
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                        ),
                         trailing: Text(
-                          DateTime.fromMillisecondsSinceEpoch(
-                            msg.timestamp * 1000,
-                          ).toLocal().toString(),
+                          formatTimestamp(
+                            DateTime.fromMillisecondsSinceEpoch(msg.timestamp),
+                          ),
                         ),
                         onTap: () {
-                          
                           Navigator.push(
                             context,
                             MaterialPageRoute<void>(
                               builder: (BuildContext context) {
-                                return ChatScreen(id: id);
+                                return ChatScreen(otherId: user.address,);
                               },
                             ),
                           );

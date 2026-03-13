@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 
 final locationProvider = StateNotifierProvider<LocationNotifier, Position?>(
@@ -6,6 +7,10 @@ final locationProvider = StateNotifierProvider<LocationNotifier, Position?>(
 );
 
 class LocationNotifier extends StateNotifier<Position?> {
+  final _ready = Completer<Position>();
+
+  Future<Position> get firstPosition => _ready.future;
+
   LocationNotifier() : super(null) {
     _init();
   }
@@ -20,6 +25,10 @@ class LocationNotifier extends StateNotifier<Position?> {
       ),
     ).listen((pos) {
       state = pos;
+
+      if (!_ready.isCompleted) {
+        _ready.complete(pos);
+      }
     });
   }
 }

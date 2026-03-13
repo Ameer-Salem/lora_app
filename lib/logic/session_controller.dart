@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'dart:typed_data';
 
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:lora_app/logic/location_controller.dart';
 import 'package:lora_app/logic/messaging_controller.dart';
 import 'package:lora_app/logic/neighbors_controller.dart';
@@ -40,14 +40,15 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     ble = ref.read(bleServiceProvider);
     db = ref.read(databaseServiceProvider);
     neighborProvider = ref.read(neighborsProvider.notifier);
+
     return const DeviceSession.disconnected();
   }
 
   Future<void> connect(BluetoothDevice device) async {
     state = DeviceSession(status: ConnectionStatus.connecting);
+    final position = await ref.read(locationProvider.notifier).firstPosition;
     try {
-      final position = ref.read(locationProvider);
-      await ble.connect(device, position!);
+      await ble.connect(device);
       await db.openDatabase(device.remoteId.str);
       device.requestMtu(512);
       _connectionSub?.cancel();
@@ -61,11 +62,18 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
         device: Device(id: device.platformName, name: device.platformName),
       );
 
-      _dataSub?.cancel();
-      // wait until characteristic exists
+      Uint8List payload = encodeLocation(position.latitude, position.longitude);
       while (ble.notifyCharacteristic == null) {
         await Future.delayed(const Duration(milliseconds: 50));
       }
+      await ble.writeCharacteristic!.device.requestMtu(220);
+      await ble.writeCharacteristic!.write([
+        Constants.locationTYPE,
+        ...payload,
+      ], allowLongWrite: true);
+      _dataSub?.cancel();
+      // wait until characteristic exists
+
       _startRetryLoop();
       _startNeighborsGetter();
       final messageProvider = ref.read(messagesProvider.notifier);
@@ -95,6 +103,17 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     } catch (e) {
       return;
     }
+  }
+
+  Uint8List encodeLocation(double lat, double lon) {
+    final latInt = (lat * 1e6).round();
+    final lonInt = (lon * 1e6).round();
+
+    final bytes = ByteData(8);
+    bytes.setInt32(0, latInt, Endian.little);
+    bytes.setInt32(4, lonInt, Endian.little);
+
+    return bytes.buffer.asUint8List();
   }
 
   Future<void> disconnect() async {
@@ -135,9 +154,17 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
     }
   }
 
+  Future<void> stopScan() async {
+    try {
+      FlutterBluePlus.stopScan();
+    } on Exception {
+      return;
+    }
+  }
+
   void _startRetryLoop() {
     _retryTimer?.cancel();
-
+    Future.delayed(const Duration(seconds: 1), () => db.getPendingSegments());
     _retryTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       if (state.status != ConnectionStatus.connected) return;
 
@@ -166,13 +193,16 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
   }
 
   void _startNeighborsGetter() {
-
     _neighborTimer?.cancel();
-    _neighborTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+    Future.delayed(
+      const Duration(seconds: 1),
+      () => neighborProvider.getNeighbors(),
+    );
+    _neighborTimer = Timer.periodic(const Duration(seconds: 30), (_) async {
       if (state.status != ConnectionStatus.connected) return;
-      await neighborProvider.getNeighbors();
+      neighborProvider.getNeighbors();
       // keep the radio happy
-      await Future.delayed(const Duration(milliseconds: 130));
+      Future.delayed(const Duration(milliseconds: 130));
     });
   }
 }

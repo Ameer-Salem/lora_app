@@ -1,6 +1,6 @@
+import 'package:lora_app/utilities/converter.dart';
 import 'dart:typed_data';
 
-import 'package:lora_app/utilities/converter.dart';
 
 class Packet {
   final int type;

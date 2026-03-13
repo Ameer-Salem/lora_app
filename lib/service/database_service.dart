@@ -1,21 +1,29 @@
+import 'package:drift/drift.dart';
 import 'dart:convert';
 import 'dart:io';
-import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:lora_app/model/message_with_segments.dart';
 import 'package:lora_app/model/tables/messages_table.dart';
 import 'package:lora_app/model/tables/segments_table.dart';
+import 'package:lora_app/model/tables/users_table.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
 part 'database_service.g.dart';
 
-@DriftDatabase(tables: [Messages, Segments])
+class UserWithLatestMessage {
+  final User user;
+  final Message lastMessage;
+
+  UserWithLatestMessage({required this.user, required this.lastMessage});
+}
+
+@DriftDatabase(tables: [Messages, Segments, Users])
 class AppDatabase extends _$AppDatabase {
   AppDatabase(String deviceId) : super(_openConnection(deviceId));
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 }
 
 LazyDatabase _openConnection(String deviceId) {
@@ -28,6 +36,96 @@ LazyDatabase _openConnection(String deviceId) {
 
 class DatabaseService {
   AppDatabase? db;
+
+  Future<void> insertOrUpdateUser({
+    required int address, // new field
+    String? name,
+    int? lastSeen,
+    double? latitude,
+    double? longitude,
+    int? rssi,
+  }) async {
+    await db!
+        .into(db!.users)
+        .insertOnConflictUpdate(
+          UsersCompanion(
+            name: Value(name),
+            lastSeen: Value(lastSeen ?? DateTime.now().millisecondsSinceEpoch),
+            latitude: Value(latitude),
+            longitude: Value(longitude),
+            rssi: Value(rssi ),
+            address: Value(address), // set address
+          ),
+        );
+  }
+
+  Stream<List<UserWithLatestMessage>> watchUsersWithLatestMessage(int myId) {
+    if (db == null) return Stream.empty();
+
+    // watch all messages
+    return (db!.select(
+      db!.messages,
+    )..orderBy([(t) => OrderingTerm.desc(t.timestamp)])).watch().asyncMap((
+      allMessages,
+    ) async {
+      final Map<int, Message> latestPerUser = {};
+
+      for (final msg in allMessages) {
+        // determine the other user in this conversation
+        final otherId = msg.sourceId == myId ? msg.destinationId : msg.sourceId;
+
+        // only keep the newest message
+        if (!latestPerUser.containsKey(otherId) ||
+            msg.timestamp > latestPerUser[otherId]!.timestamp) {
+          latestPerUser[otherId] = msg;
+        }
+      }
+
+      final results = <UserWithLatestMessage>[];
+      for (final entry in latestPerUser.entries) {
+        final userId = entry.key;
+        final message = entry.value;
+
+        final user = await (db!.select(
+          db!.users,
+        )..where((u) => u.address.equals(userId))).getSingleOrNull();
+
+        if (user != null) {
+          results.add(UserWithLatestMessage(user: user, lastMessage: message));
+        }
+      }
+
+      // sort by latest message timestamp
+      results.sort(
+        (a, b) => b.lastMessage.timestamp.compareTo(a.lastMessage.timestamp),
+      );
+
+      return results;
+    });
+  }
+
+  Future<User?> getUser(int address) async {
+    return (db!.select(
+      db!.users,
+    )..where((u) => u.address.equals(address))).getSingleOrNull();
+  }
+   Stream<User?> watchUser(int address) {
+    return (db!.select(
+      db!.users,
+    )..where((u) => u.address.equals(address))).watchSingleOrNull(); // Notice the change here!
+  }
+
+  Stream<List<User>> watchAllUsers() {
+    return db!.select(db!.users).watch();
+  }
+
+  Future<void> updateLastSeen(int address) async {
+    await (db!.update(
+      db!.users,
+    )..where((u) => u.address.equals(address))).write(
+      UsersCompanion(lastSeen: Value(DateTime.now().millisecondsSinceEpoch)),
+    );
+  }
 
   Stream<List> getLatestMessages(int myId) {
     return db!.select(db!.messages).watch().map((allMessages) {
@@ -103,9 +201,9 @@ class DatabaseService {
   Stream<List<MessageWithSegments>> watchMessages(String status) {
     if (db == null) return Stream.empty();
 
-    final SimpleSelectStatement<$MessagesTable, Message> query =
-        db!.select(db!.messages)
-          ..orderBy([(t) => OrderingTerm.asc(t.timestamp)]);
+    final SimpleSelectStatement<$MessagesTable, Message> query = db!.select(
+      db!.messages,
+    )..orderBy([(t) => OrderingTerm.asc(t.timestamp)]);
 
     return query.watch().asyncMap((messages) async {
       final results = <MessageWithSegments>[];

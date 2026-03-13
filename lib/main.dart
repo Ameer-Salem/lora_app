@@ -46,24 +46,4 @@ class MyApp extends ConsumerWidget {
     );
   }
 }
-// class OfflineMap extends StatelessWidget {
-//   const OfflineMap({super.key});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return FlutterMap(
-//       options: MapOptions(
-//         initialCenter: LatLng(32.05277,44.32841),
-//         initialZoom: 13,
-//       ),
-//       children: [
-//         TileLayer(
-//           tileProvider: MbTilesTileProvider.fromPath(
-//             path: 'assets/maps/najaf.mbtiles',
-//           ),
-//         ),
-//       ],
-//     );
-//   }
-// }
 

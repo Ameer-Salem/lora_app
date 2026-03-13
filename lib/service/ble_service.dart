@@ -1,8 +1,6 @@
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'dart:async';
 import 'dart:typed_data';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:geolocator/geolocator.dart';
-import 'package:lora_app/utilities/constants.dart';
 import 'package:lora_app/utilities/converter.dart';
 
 class BleService {
@@ -18,7 +16,7 @@ class BleService {
     await FlutterBluePlus.turnOn();
   }
 
-  Future<void> connect(BluetoothDevice device, Position position) async {
+  Future<void> connect(BluetoothDevice device) async {
     await device.connect(autoConnect: false, license: License.free);
     deviceID = int.parse(device.platformName);
     services = await device.discoverServices();
@@ -27,10 +25,7 @@ class BleService {
         if (c.uuid == writeGUID) {
           // Store write characteristic
           writeCharacteristic = c;
-          String payload =
-              "${Constants.locationTYPE},${position.latitude},${position.longitude}";
-          await c.device.requestMtu(220);
-          c.write(payload.codeUnits,allowLongWrite: true);
+          
         }
         if (c.uuid == notifyGUID) {
           notifyCharacteristic = c;
