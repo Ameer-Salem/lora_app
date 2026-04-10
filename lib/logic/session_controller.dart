@@ -164,7 +164,6 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
 
   void _startRetryLoop() {
     _retryTimer?.cancel();
-    Future.delayed(const Duration(seconds: 1), () => db.getPendingSegments());
     _retryTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
       if (state.status != ConnectionStatus.connected) return;
 

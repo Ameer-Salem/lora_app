@@ -44,7 +44,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
           const Scaffold(body: Center(child: CircularProgressIndicator())),
       error: (err, stack) => Scaffold(body: Center(child: Text('Error: $err'))),
       data: (user) {
-        print(user?.lastSeen);
         final lastActive = DateTime.fromMillisecondsSinceEpoch(
           user?.lastSeen ?? 0,
         );

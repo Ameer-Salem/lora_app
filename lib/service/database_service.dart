@@ -225,9 +225,12 @@ class DatabaseService {
 
     return (db!.select(db!.segments)..where(
           (s) =>
-              s.ackReceived.equals(false) &
+              s.ackReceived.equals(false) & 
               s.retryCount.isSmallerThanValue(maxRetries),
-        ))
+              
+        )..orderBy(
+          [(s) => OrderingTerm.asc(s.uid), (s) => OrderingTerm.asc(s.segmentIndex)],)
+        )
         .get();
   }
 
