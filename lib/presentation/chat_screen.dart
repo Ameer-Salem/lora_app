@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:lora_app/logic/messaging_controller.dart';
 import 'package:lora_app/logic/providers.dart';
+import 'package:lora_app/logic/session_controller.dart';
 import 'package:lora_app/model/message_bubble.dart';
 import 'package:lora_app/presentation/map_screen.dart';
+import 'package:lora_app/presentation/scan_screen.dart';
 import 'package:lora_app/utilities/colors.dart';
 
 class ChatScreen extends ConsumerStatefulWidget {
@@ -18,9 +20,21 @@ class ChatScreen extends ConsumerStatefulWidget {
 class _ChatScreenState extends ConsumerState<ChatScreen> {
   TextEditingController controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+
+  late final ProviderSubscription connectionSub;
   @override
   void initState() {
     super.initState();
+    connectionSub = ref.listenManual(connectionStatusProvider, (prev, next) {
+      if (next.status == ConnectionStatus.disconnected) {
+        if (!mounted) return;
+
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => ScanScreen()),
+          (route) => false,
+        );
+      }
+    });
     Future.microtask(() async {
       ref.read(messagesProvider.notifier).watchMessages(widget.otherId);
     });
@@ -33,7 +47,13 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
       }
     });
   }
-
+  @override
+  void dispose() {
+    connectionSub.close();
+    controller.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     final userAsyncValue = ref.watch(userProvider(widget.otherId));
@@ -120,10 +140,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                       else if (rssi >= 0)
                         Icon(Icons.route, size: 20, color: Colors.grey),
                       if (rssi < 0)
-                        Text(
-                          rssi.toString(),
-                          style: TextStyle(fontSize: 12),
-                        )
+                        Text(rssi.toString(), style: TextStyle(fontSize: 12))
                       else
                         Text('unknown', style: TextStyle(fontSize: 12)),
                     ],

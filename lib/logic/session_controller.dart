@@ -145,10 +145,13 @@ class DeviceSessionNotifier extends Notifier<DeviceSession> {
 
   Future<void> startScan() async {
     try {
-      FlutterBluePlus.startScan(
-        timeout: const Duration(seconds: 5),
-        withServices: [ref.read(bleServiceProvider).serviceGUID],
-      );
+      if (await FlutterBluePlus.adapterState.first ==
+          BluetoothAdapterState.on) {
+        FlutterBluePlus.startScan(
+          timeout: const Duration(seconds: 5),
+          withServices: [ref.read(bleServiceProvider).serviceGUID],
+        );
+      }
     } on Exception {
       return;
     }

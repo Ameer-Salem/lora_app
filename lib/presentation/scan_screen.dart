@@ -19,13 +19,11 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
     final manager = ref.read(connectionStatusProvider.notifier);
     _scanStream = manager.getScanResults();
     _timer = Timer.periodic(
-      Duration(seconds: 8),
+      Duration(seconds: 1),
       (_) => ref.read(connectionStatusProvider.notifier).startScan(),
     );
-    // run AFTER first frame to avoid build conflicts
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(connectionStatusProvider.notifier).startScan();
-    });
+   
+    
   }
 
   @override
@@ -36,7 +34,7 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final manager = ref.watch(connectionStatusProvider.notifier);
+    final session = ref.watch(connectionStatusProvider.notifier);
     return Scaffold(
       appBar: AppBar(title: const Text('LoRa Devices'), centerTitle: true),
       body: Column(
@@ -67,8 +65,8 @@ class _ScanScreenState extends ConsumerState<ScanScreen> {
                     ),
                     subtitle: Text(data[index].device.remoteId.str),
                     onTap: () async {
-                      await manager.stopScan();
-                      await manager.connect(data[index].device);
+                      await session.stopScan();
+                      await session.connect(data[index].device);
                     },
                   ),
                 );

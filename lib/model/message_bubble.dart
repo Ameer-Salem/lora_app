@@ -27,7 +27,7 @@ class MessageBubble extends StatelessWidget {
       case 'delivered':
         return const Icon(Icons.check, color: Colors.green, size: 17);
     }
-    throw ArgumentError('Unknown status: $status');
+    return Text('Unknown status: $status');
   }
 
   @override
@@ -62,7 +62,7 @@ class MessageBubble extends StatelessWidget {
               text,
               style: TextStyle(
                 fontSize: 16,
-                color: Colors.amber
+                color: Colors.white
               ),
             ),
           ),
